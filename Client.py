@@ -10,13 +10,19 @@ from .Mapping import *
 import traceback
 
 from CommonClient import (
-	CommonContext,
 	ClientCommandProcessor,
 	get_base_parser,
 	logger,
 	server_loop,
 	gui_enabled,
 )
+
+tracker_loaded = False
+try:
+    from worlds.tracker.TrackerClient import TrackerGameContext as SuperContext
+    tracker_loaded = True
+except ModuleNotFoundError:
+    from CommonClient import CommonContext as SuperContext
 
 class TouhouClientProcessor(ClientCommandProcessor):
 	def _cmd_multiple_difficulty_check(self, active = None):
@@ -203,8 +209,10 @@ class TouhouClientProcessor(ClientCommandProcessor):
 			logger.error("Captures cannot be accessed before connecting to the game and server")
 			return False
 
-class TouhouContext(CommonContext):
+class TouhouContext(SuperContext):
 	"""Touhou Game Context"""
+	tags = {"AP"}
+
 	def __init__(self, server_address: Optional[str], password: Optional[str]) -> None:
 		super().__init__(server_address, password)
 		self.game = DISPLAY_NAME
@@ -267,6 +275,8 @@ class TouhouContext(CommonContext):
 		"""
 		Manage the package received from the server
 		"""
+		super().on_package(cmd, args)
+	
 		if cmd == "Connected":
 			self.previous_location_checked = args['checked_locations']
 			self.all_location_ids = set(args["missing_locations"] + args["checked_locations"])
@@ -1790,6 +1800,8 @@ def launch():
 		"""
 		ctx = TouhouContext(args.connect, args.password)
 		ctx.server_task = asyncio.create_task(server_loop(ctx))
+		if tracker_loaded:
+			ctx.run_generator()
 		if gui_enabled:
 			ctx.run_gui()
 		ctx.run_cli()
