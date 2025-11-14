@@ -9,6 +9,7 @@ from .Options import Th08Options
 from .Regions import create_regions
 from .Rules import set_rules
 from .SpellCards import SPELL_CARDS_LIST
+from .Tracker import setup_options_from_slot_data
 from BaseClasses import Item, ItemClassification
 
 def launch_client():
@@ -32,6 +33,9 @@ class TWorld(World):
 	item_name_to_id = {name: data.code for name, data in item_table.items()}
 	location_name_to_id = {name: id for name, id in location_table.items()}
 
+	using_ut: bool
+	ut_can_gen_without_yaml = False
+
 	def generate_early(self):
 		self.spell_cards = []
 		self.treasures_locations = []
@@ -40,6 +44,9 @@ class TWorld(World):
 		self.capture_spell_cards_count = 0
 		self.nb_treasure_not_placed = 0
 		self.spell_cards_teams = CHARACTERS_LIST
+		self.characters_list = []
+
+		setup_options_from_slot_data(self)
 
 		mode = getattr(self.options, "mode")
 		spell_card_difficulties = getattr(self.options, "spell_card_difficulties")
@@ -51,7 +58,6 @@ class TWorld(World):
 		self.capture_spell_cards_count = getattr(self.options, "capture_spell_cards_count")
 		characters = getattr(self.options, "characters")
 		spell_cards_teams = getattr(self.options, "spell_cards_teams")
-		self.characters_list = []
 
 		goal = getattr(self.options, "goal")
 
@@ -78,9 +84,10 @@ class TWorld(World):
 				goal = TREASURE_GOAL
 
 			# If we do not have all 4 teams enabled for spell practice, we filter them to get the number needed
-			if spell_cards_teams < 4 and characters != SOLO_ONLY:
-				self.random.shuffle(self.spell_cards_teams)
-				self.spell_cards_teams = self.spell_cards_teams[:spell_cards_teams]
+			if not self.using_ut:
+				if spell_cards_teams < 4 and characters != SOLO_ONLY:
+					self.random.shuffle(self.spell_cards_teams)
+					self.spell_cards_teams = self.spell_cards_teams[:spell_cards_teams]
 
 			# We filter out the spell cards that are excluded
 			for id, spell in SPELL_CARDS_LIST.items():
@@ -260,6 +267,10 @@ class TWorld(World):
 			"limit_lives": self.options.limit_lives.value,
 			"limit_bombs": self.options.limit_bombs.value,
 			"capture_spell_cards_list": self.capture_spell_cards_list,
+			"treasures_locations": self.treasures_locations,
+			"spell_cards": self.spell_cards,
+			"characters_list": self.characters_list,
+			"spell_cards_teams": self.spell_cards_teams,
 			"nb_treasure_not_placed": self.nb_treasure_not_placed,
 		}
 
@@ -454,7 +465,7 @@ class TWorld(World):
 					item_pool += [self.create_item(stage['name']) for _ in range(0, quantity)]
 
 		# Spell Card
-		if mode in SPELL_PRACTICE_MODE:
+		if mode in SPELL_PRACTICE_MODE and not self.using_ut:
 			# Failsafe
 			if not spell_card_difficulties:
 				spell_card_difficulties = ["Easy", "Normal", "Hard", "Lunatic", "Extra"]
@@ -678,6 +689,9 @@ class TWorld(World):
 					self.multiworld.get_location("[Yuyuko] Stage 6B Clear", self.player).place_locked_item(ending_final_b_yuyuko)
 					number_placed_item += 8
 
+		if self.using_ut:
+			return
+
 		if mode in SPELL_PRACTICE_MODE and duplicate_spell_cards > 0:
 			remaining_locations = total_locations - (len(item_pool) + number_placed_item)
 
@@ -724,3 +738,7 @@ class TWorld(World):
 	def create_regions(self):
 		all_spell_cards = self.spell_cards + [self.treasure_final_spell_card] if self.treasure_final_spell_card != -1 else self.spell_cards
 		create_regions(self.multiworld, self.player, self.options, all_spell_cards, self.spell_cards_teams)
+
+	@staticmethod
+	def interpret_slot_data(slot_data):
+		return slot_data
