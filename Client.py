@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Type
 import asyncio
 import colorama
 import time
@@ -19,12 +19,15 @@ from CommonClient import (
 
 tracker_loaded = False
 try:
-    from worlds.tracker.TrackerClient import TrackerGameContext as SuperContext
+    from worlds.tracker.TrackerClient import (TrackerGameContext as SuperContext,
+                                                TrackerCommandProcessor as SuperCommandProcessor,
+                                                UT_VERSION)
     tracker_loaded = True
 except ModuleNotFoundError:
     from CommonClient import CommonContext as SuperContext
+    from CommonClient import ClientCommandProcessor as SuperCommandProcessor
 
-class TouhouClientProcessor(ClientCommandProcessor):
+class TouhouClientProcessor(SuperCommandProcessor):
 	def _cmd_multiple_difficulty_check(self, active = None):
 		"""Toggle the possibility to check multiple difficulty check by doing the highest difficulty
         :param active: If "on" or "true", enable it. If "off" or "false", disable it."""
@@ -209,9 +212,13 @@ class TouhouClientProcessor(ClientCommandProcessor):
 			logger.error("Captures cannot be accessed before connecting to the game and server")
 			return False
 
+class MixedCommandProcessor(TouhouClientProcessor, SuperCommandProcessor):
+    pass
+
 class TouhouContext(SuperContext):
 	"""Touhou Game Context"""
 	tags = {"AP"}
+	command_processor: Type[MixedCommandProcessor] = MixedCommandProcessor
 
 	def __init__(self, server_address: Optional[str], password: Optional[str]) -> None:
 		super().__init__(server_address, password)
