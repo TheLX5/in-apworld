@@ -270,6 +270,8 @@ class TouhouContext(SuperContext):
 	def make_gui(self):
 		ui = super().make_gui()
 		ui.base_title = f"{DISPLAY_NAME} Client"
+		if tracker_loaded:
+			ui.base_title += f" + Universal Tracker {UT_VERSION} | Archipelago"
 		return ui
 
 	async def server_auth(self, password_requested: bool = False):
